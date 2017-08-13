@@ -4,26 +4,23 @@ import android.Manifest;
 import android.app.Service;
 import android.content.Intent;
 import android.content.IntentSender;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
-import android.widget.Toast;
+
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
-import java.util.ArrayList;
 
 /*This class gets the current location and sends it to DbHelper to be added to the data base and to the activity to update the UI.*/
 
@@ -32,8 +29,8 @@ public class LocationService  extends Service implements GoogleApiClient.Connect
     private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
     private static final String TAG = LocationService.class.getSimpleName();
 //Broad cast receiver fields
-    public static String INTENT_LOCATION_RECEIVED = "location_received";
-    public static final String EXTRA_LOCATION = "location";
+    public static String POSITION_INTENT = "position_intent";
+    public static final String NEW_POSITION = "new_position";
 
 //Create GoogleApiClient field to access Google Play services.
     private GoogleApiClient mGoogleApiClient;
@@ -100,13 +97,13 @@ public class LocationService  extends Service implements GoogleApiClient.Connect
         Location location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
 //If this is the first time Google Play Services is checking location, location might be null.
         if (location == null) {
-//Request location updates
             if(hasLocationPermission()) {
                 Log.d(TAG, "Has location permissions");
+//Request location updates
                 LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
             }
         } else {
-//If location is not null handle it in this method
+//If location is not null request location updates and inset as new location
             LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
             insertNewPosition(location);
         }
@@ -160,16 +157,21 @@ So as the user is moving around with their phone or tablet, the location APIs ar
 //Helper method to check for permission
     private boolean hasLocationPermission() {
         Log.d(TAG, "hasLocationPermission");
-// if we are below API 23, we already have permission from when the app was installed
+// if the SDK is below marshmallow
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+//if the user did not allow ACCESS_FINE_LOCATION and ACCESS_COARSE_LOCATION permission then return false
             if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
                     && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 Log.e(TAG, "No permissions!");
                 return false;
+//if the user allow ACCESS_FINE_LOCATION and ACCESS_COARSE_LOCATION permission then return true (have permission)
             } else {
+                Log.d(TAG, "Has permissions!");
                 return true;
             }
+// if the SDK is above marshmallow (have permission)
         } else {
+            Log.d(TAG, "Has permissions!");
             return true;
         }
     }
@@ -186,8 +188,8 @@ So as the user is moving around with their phone or tablet, the location APIs ar
 
 //Send the position to MapsActivity using broadcast receiver
         Position position = new Position(time,latitude,longitude);
-        Intent intent = new Intent(INTENT_LOCATION_RECEIVED);
-        intent.putExtra(EXTRA_LOCATION, position);
+        Intent intent = new Intent(POSITION_INTENT);
+        intent.putExtra(NEW_POSITION, position);
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
 
